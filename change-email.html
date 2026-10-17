@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Medlon Biotech — Change Admin Email</title>
+<style>
+:root{font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;color:#232e31;background:#f6f5f3}*{box-sizing:border-box}body{margin:0;padding:26px 14px;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at top left,#ffe8d2,transparent 60%),#f6f5f3}.wrap{width:100%;max-width:480px;background:white;border:1px solid #eee2dd;box-shadow:0 15px 50px #5b283015;border-radius:23px;padding:28px 23px}.brand{color:#a72f35;font-size:22px;letter-spacing:.3px;font-weight:900}.brand small{color:#6d5b53;font-size:11px;display:block;letter-spacing:2px;margin-top:4px}h1{font-size:26px;margin:24px 0 8px;line-height:1.15}p{font-size:14px;line-height:1.65;color:#5c6869;margin:8px 0 16px}label{display:block;font-size:13px;font-weight:750;margin:16px 0 7px}input{width:100%;font:inherit;border:1px solid #d5dbda;border-radius:12px;padding:14px;background:#fff;color:#1e2a2a}input:focus{outline:3px solid #a72f3526;border-color:#a72f35}button{width:100%;padding:15px;margin:21px 0 7px;background:#a92f37;color:#fff;border:0;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.note{background:#fff7ed;border:1px solid #f3dcc0;border-radius:11px;padding:12px;font-size:12px;line-height:1.6;color:#755338}.status{margin-top:15px;font-size:13px;line-height:1.55;border-radius:10px;min-height:20px;white-space:pre-line}.status.error{color:#a22129;background:#fff1f2;padding:12px}.status.ok{color:#076448;background:#eafaef;padding:12px}.footer{border-top:1px solid #edf0ed;margin-top:22px;padding-top:12px;color:#8d9392;font-size:11px}
+</style>
+</head>
+<body>
+<main class="wrap">
+<div class="brand">☀ MEDLON <small>BIOTECH · PRIVATE ADMIN</small></div>
+<h1>Change Admin Email</h1>
+<p>अपनी मौजूदा Firebase Admin ID की email बदलें। नया user नहीं बनेगा; आपकी UID वही रहेगी।</p>
+<div class="note">यह सिर्फ आपके अपने <strong>medlon-secure-admin</strong> Preview पर इस्तेमाल करने के लिए है। Password किसी से share न करें। नई email पर verification message आएगा।</div>
+<form id="changeForm">
+<label for="oldEmail">Current Admin Email</label>
+<input id="oldEmail" type="email" autocomplete="username" inputmode="email" required placeholder="Old admin email">
+<label for="password">Current Password</label>
+<input id="password" type="password" autocomplete="current-password" required placeholder="Current Firebase password">
+<label for="newEmail">New Admin Email</label>
+<input id="newEmail" type="email" autocomplete="off" inputmode="email" required placeholder="Your new email address">
+<button type="submit" id="submit">Send verification to new email →</button>
+</form>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+<div class="footer">Firebase authentication runs on Google Firebase. This page does not save or send your password anywhere else. Remove this temporary page after the email is changed.</div>
+</main>
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import {getAuth,setPersistence,inMemoryPersistence,signInWithEmailAndPassword,verifyBeforeUpdateEmail,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+const app=initializeApp({
+  apiKey:'AIzaSyCcyi4y82mxgaS8_ITtT6bM9AXALB5aflA',
+  authDomain:'medlon-biotech-admin.firebaseapp.com',
+  projectId:'medlon-biotech-admin',
+  appId:'1:1048929043069:web:218b08165166837e582714'
+});
+const auth=getAuth(app);
+const form=document.querySelector('#changeForm'),status=document.querySelector('#status'),button=document.querySelector('#submit');
+const say=(text,kind='')=>{status.textContent=text;status.className=`status ${kind}`;};
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const oldEmail=document.querySelector('#oldEmail').value.trim();
+  const newEmail=document.querySelector('#newEmail').value.trim();
+  const password=document.querySelector('#password').value;
+  if(oldEmail.toLowerCase()===newEmail.toLowerCase()) {say('नई email पुरानी email से अलग होनी चाहिए।','error');return;}
+  button.disabled=true;
+  say('Signing in securely and requesting email verification…');
+  try {
+    await setPersistence(auth,inMemoryPersistence);
+    const credential=await signInWithEmailAndPassword(auth,oldEmail,password);
+    document.querySelector('#password').value='';
+    if(credential.user.email?.toLowerCase()!==oldEmail.toLowerCase())throw Error('Signed-in account mismatch');
+    await verifyBeforeUpdateEmail(credential.user,newEmail);
+    say('Verification email भेज दी गई है। अब नई email का inbox/spam खोलकर Firebase verification link दबाएँ। Verify होने के बाद Firebase → Authentication → Users में नई email दिखनी चाहिए। UID वही रहेगी।','ok');
+  } catch(err) {
+    const labels={
+      'auth/invalid-email':'Email address गलत है।',
+      'auth/email-already-in-use':'यह नई email पहले से किसी Firebase account में इस्तेमाल हो रही है।',
+      'auth/invalid-credential':'पुरानी email या password सही नहीं है।',
+      'auth/wrong-password':'पुराना password गलत है।',
+      'auth/user-not-found':'पुराना account नहीं मिला।',
+      'auth/too-many-requests':'बहुत अधिक कोशिशें हुई हैं। कुछ देर बाद retry करें।',
+      'auth/requires-recent-login':'दोबारा current email/password से login करके retry करें।',
+      'auth/unauthorized-domain':'Firebase authorised-domain setting चेक करें।',
+      'auth/operation-not-allowed':'Firebase में email update allowed नहीं है।',
+      'auth/network-request-failed':'Internet connection चेक करें।'
+    };
+    say((labels[err.code]||'Email update request failed. Error: '+(err.code||'unknown')),'error');
+  } finally {
+    document.querySelector('#password').value='';
+    try{await signOut(auth);}catch{}
+    button.disabled=false;
+  }
+});
+</script>
+</body>
+</html>
