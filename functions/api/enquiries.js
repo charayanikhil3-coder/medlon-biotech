@@ -12,6 +12,8 @@ export async function onRequestPost({request,env}) {
   if(!form||typeof form!=='object'||Array.isArray(form)) return json({error:'Invalid data.'},400);
   // Honeypot input must remain empty. Quietly fail closed for spam submissions.
   if(clean(form.website,100)) return json({error:'Unable to submit this enquiry.'},400);
+  const enquiry_type=clean(form.enquiry_type,20);
+  if(!['product','general'].includes(enquiry_type)) return json({error:'Invalid enquiry type.'},400);
   const buyer_type=clean(form.buyer_type,20),name=clean(form.name,80),phone=clean(form.phone,30).replace(/[\s()\-]/g,''),city=clean(form.city,80),product=clean(form.product,120),message=clean(form.message,1000),quantity=Number(form.quantity);
   if(!['Retail','Wholesale'].includes(buyer_type)||name.length<2||!/^[+]?[0-9]{10,15}$/.test(phone)||product.length<2||message.length<5||!Number.isInteger(quantity)||quantity<1||quantity>9999||form.consent!==true) return json({error:'Please fill in buyer type, name, valid phone, product, quantity, message and consent.'},400);
   // Best-effort modest abuse control using salted digest of requesting IP, never raw IP.
@@ -23,7 +25,7 @@ export async function onRequestPost({request,env}) {
     const limit=await env.ORDERS_DB.prepare('INSERT INTO request_limits (identity_hash,slot,hits) VALUES (?, ?, 1) ON CONFLICT(identity_hash,slot) DO UPDATE SET hits=hits+1 RETURNING hits').bind(fingerprint,slot).first();
     if(limit && limit.hits>5) return json({error:'Too many requests. Try again later.'},429);
     const id='MB-'+crypto.randomUUID().slice(0,8).toUpperCase();
-    await env.ORDERS_DB.prepare('INSERT INTO enquiries (id,buyer_type,name,phone,city,product,quantity,message) VALUES (?,?,?,?,?,?,?,?)').bind(id,buyer_type,name,phone,city,product,quantity,message).run();
+    await env.ORDERS_DB.prepare('INSERT INTO enquiries (id,buyer_type,name,phone,city,product,quantity,message,source) VALUES (?,?,?,?,?,?,?,?,?)').bind(id,buyer_type,name,phone,city,product,quantity,message,enquiry_type==='general'?'General Enquiry':'Product Enquiry').run();
     // Manual fulfilment only, subject to licence/prescription verification when required.
     return json({ok:true,id,status:'New'},201);
   } catch(e){console.error('D1 enquiry intake failed',e);return json({error:'Could not save your enquiry. Please try again.'},503)}
